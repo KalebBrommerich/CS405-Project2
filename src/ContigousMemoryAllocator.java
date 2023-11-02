@@ -118,7 +118,7 @@ public class ContigousMemoryAllocator {
 		//TODO: add code below
 		order_partitions();
 		int i = 0;
-		while(i<partList.size()) {
+		while(i<partList.size()-1) {
 			Partition part = partList.get(i);
 			if(part.isbFree()) {
 				int endAddr = part.getBase()+part.getLength()-1;
