@@ -1,4 +1,5 @@
 package Project2;
+import java.awt.Taskbar.State;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -32,7 +33,7 @@ public class ContigousMemoryAllocator {
 	public void print_status() {
 		//TODO: add code below
 		order_partitions();
-		System.out.printf("Paritions [Allocated=%d KB, Free=%d KB",allocated_memory(),free_memory());
+		System.out.printf("Paritions [Allocated=%d KB, Free=%d KB \n",allocated_memory(),free_memory());
 		for(Partition part: partList) {
 			System.out.printf("Address [%d:%d] %s (%d KB) \n",
 					part.getBase(),part.getBase()+ part.getLength()-1,
@@ -124,10 +125,14 @@ public class ContigousMemoryAllocator {
 				int j = i+1;
 				while(j < partList.size() && partList.get(j).isbFree()) {
 					//merge j into i
+
 					int startj = partList.get(j).getBase();
 					if(startj== endAddr +1) {
 						part.setLength((part.getLength() + partList.get(j).getLength()));
 						partList.remove(partList.get(j));
+						System.out.println("merge");
+						endAddr = part.getBase()+part.getLength()-1;
+						continue;
 					}
 					j++;
 				}
@@ -165,7 +170,7 @@ public class ContigousMemoryAllocator {
 					System.out.println("Succesfully allocated " + rqSize + " to " + process);
 				}
 				else {
-					System.err.println("Couldn't allocated " + rqSize + " to " + process);
+					System.err.println("Couldn't allocate " + rqSize + " to " + process);
 				}
 			}
 			else if(arr[0].toLowerCase().equals("rl")){
