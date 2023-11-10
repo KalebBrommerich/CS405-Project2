@@ -20,17 +20,7 @@ public class ContigousMemoryAllocator {
 		this.size = size;
 		this.allocMap = new HashMap<>();
 		this.partList = new ArrayList<>();
-		this.partList.add(new Partition(0, size)); //add the first hole, which is the whole memory at start up
-	}
-      
-	// prints the list of available commands
-	public void print_help_message() {
-		//TODO: add code below
-		System.out.println("RQ <process> <size> request a memory partition w/ <size> to <process>");
-		System.out.println("RL <process> release memory partition to <process>");
-		System.out.println("STAT show all memory partitions");
-		System.out.println("EXIT exit simulator");
-		System.out.println("H show help (available commands)");
+		this.partList.add(new Partition(0, size, -1)); //add the first hole, which is the whole memory at start up
 	}
       
 	// prints the allocation map (free + allocated) in ascending order of base addresses
@@ -39,9 +29,10 @@ public class ContigousMemoryAllocator {
 		order_partitions();
 		System.out.printf("Paritions [Allocated=%d KB, Free=%d KB \n",allocated_memory(),free_memory());
 		for(Partition part: partList) {
-			System.out.printf("Address [%d:%d] %s (%d KB) \n",
+			System.out.printf("Address [%d:%d] %s (%d KB) {%d ms}\n",
 					part.getBase(),part.getBase()+ part.getLength()-1,
-					part.isbFree() ? "Free" : part.getProcess(), part.getLength());
+					part.isbFree() ? "Free" : part.getProcess(), part.getLength(),
+					part.getRemainingTime());
 		}
 	}
       
@@ -74,16 +65,20 @@ public class ContigousMemoryAllocator {
 	}
       
 	// implements the first fit memory allocation algorithm
-	public int first_fit(String process, int size) {
+	public int first_fit(String process, int size, int time) {
 		//TODO: add code below
+		System.out.println("Start First Fit Method: size=" + size);
 		if(allocMap.containsKey(process)) return -1;//process allocated a partition already
 		int index =0,alloc = -1;
+		System.out.println("Start While Loop in FFM");
 		while(index<partList.size()) {
 			Partition part = partList.get(index);
+			//part.getLength is the size of the partitions
 			if(part.isbFree() && part.getLength() >= size) {//found a good partition
-				Partition allocPart = new Partition(part.getBase(),size);
+				Partition allocPart = new Partition(part.getBase(),size, time);
 				allocPart.setbFree(false);
 				allocPart.setProcess(process);
+				allocPart.setRemainingTime(time);
 				partList.add(index, allocPart);//insert this partition to list
 				allocMap.put(process, allocPart);
 				part.setBase(part.getBase()+size);
@@ -216,6 +211,7 @@ public class ContigousMemoryAllocator {
 		return temp;
 	}
 	public static void main(String args[]) {
+
 		/*System.out.println("Contiguos allocater thing");
 		Scanner sc = new Scanner(System.in);
 		System.out.println("Enter max physical mem size (KB)");
@@ -225,7 +221,8 @@ public class ContigousMemoryAllocator {
 			System.exit(-1);
 		}
 		ContigousMemoryAllocator allocator = new ContigousMemoryAllocator(size);*/
-		int MemoryMax = -1, ProcSizeMax = -1, NumProc = -1, MaxProcTime = -1;
+		int MemoryMax = -1, ProcSizeMax = -1, NumProc = -1, MaxProcTime = -1, size = -1;
+
 		boolean fileNotChosen = true;
 		while(fileNotChosen)
 		{
@@ -236,30 +233,35 @@ public class ContigousMemoryAllocator {
 			
 			if(returnVal == JFileChooser.APPROVE_OPTION) {
 				File file = chooser.getSelectedFile();
-				Scanner sc;
+				Scanner scr;
 				try {
-					sc = new Scanner(file);
-					while(sc.hasNextLine()) {
-						String line = sc.nextLine();
+					scr = new Scanner(file);
+					while(scr.hasNextLine()) {
+						String line = scr.nextLine();
 						String arr[] = line.split(" ");
 						if(arr.length < 3) continue;
 						String key = arr[0].toUpperCase();
 						switch(key) {
 							case "MEMORY_MAX":
-								System.out.println("5");
+								//System.out.println("5");
 								if(arr.length < 4) continue;
 								MemoryMax = convertToKB(arr);
+								size = MemoryMax;
+								System.out.println("Memory Max: " + MemoryMax);
 								break;
 							case "PROC_SIZE_MAX":
 								if(arr.length < 4) continue;
 								ProcSizeMax = convertToKB(arr);
+								System.out.println("Proc_Size_Max: " + ProcSizeMax);
 								break;
 							case "NUM_PROC":
 								NumProc = Integer.parseInt(arr[2]);
+								System.out.println("Num Proc: " + NumProc);
 								break;
 							case "MAX_PROC_TIME":
 								if(arr.length < 4) continue;
 								MaxProcTime = convertToMS(arr);
+								System.out.println("Max Proc Time: " + MaxProcTime);
 								break;
 							default:
 								System.out.println("The key {"+arr[0]+"} in the config file is not supported.");
@@ -277,12 +279,13 @@ public class ContigousMemoryAllocator {
 				}
 			}
 		}
-		
+
 		ArrayList<Process> proc = generateProcesses(ProcSizeMax, NumProc, MaxProcTime);
 		for(Process p: proc) {
 			System.out.println(p.toString());
 		}
 		
+  	ContigousMemoryAllocator allocator = new ContigousMemoryAllocator(size);
 		Scanner sc = new Scanner(System.in);
 		while(true) {
 			
@@ -294,7 +297,7 @@ public class ContigousMemoryAllocator {
 				//allocator.print_help_message();
 			}
 			else if(arr[0].toLowerCase().equals("stat")) {
-				//allocator.print_status();
+				allocator.print_status();
 			}
 			else if(arr[0].toLowerCase().equals("exit")) {
 				break;
@@ -302,21 +305,22 @@ public class ContigousMemoryAllocator {
 			else if(arr[0].toLowerCase().equals("rq")) {
 				String process = arr[1];
 				int rqSize = Integer.parseInt(arr[2]);
-				/*if(allocator.first_fit(process, rqSize)>0) {
-					//System.out.println("Succesfully allocated " + rqSize + " to " + process);
-				//}
+				int rqTime = Integer.parseInt(arr[3]);
+				if(allocator.first_fit(process, rqSize, rqTime)>0) {
+					System.out.println("Succesfully allocated " + rqSize + " KB and " + rqTime + " ms to " + process);
+				}
 				else {
-					System.err.println("Couldn't allocate " + rqSize + " to " + process);
-				}*/
+					System.err.println("Couldn't allocate " + rqSize + " KB and " + rqTime + " ms to " + process);
+				}
 			}
 			else if(arr[0].toLowerCase().equals("rl")){
 				String process = arr[1];
-				/*if(allocator.release(process)>0) {
-					//System.out.println("Succesfully deallocated "+ process);
-				//}
+				if(allocator.release(process)>0) {
+					System.out.println("Succesfully deallocated "+ process);
+				}
 				else {
 					System.err.println("Couldn't deallocate "+ process);
-				}*/
+				}
 			}
 		}
 	}
