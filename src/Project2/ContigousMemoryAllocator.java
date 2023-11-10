@@ -1,4 +1,5 @@
 package Project2;
+import java.beans.PropertyChangeSupport;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.util.ArrayList;
@@ -196,6 +197,24 @@ public class ContigousMemoryAllocator {
 		}
 	}
 	
+	private static ArrayList<Process> generateProcesses(int procSizeMax, int numProc, int maxProcTime) {
+		ArrayList<Process> temp = new ArrayList<Process>();
+		for(int i = 0;i<numProc;i++) {
+			//round MS to Seconds
+			//temp.add(new Process((int)(Math.random()*procSizeMax),(int)Math.round((Math.random()*maxProcTime) + 500) / 1000 * 1000));
+		}
+		temp.add(new Process(123, 6000));
+		temp.add(new Process(13, 4000));
+		temp.add(new Process(210, 8000));
+		temp.add(new Process(23, 2000));
+		temp.add(new Process(182, 5000));
+		temp.add(new Process(93, 5000));
+		temp.add(new Process(200,9000));
+		temp.add(new Process(102,10000));
+		temp.add(new Process(52, 1000));
+		temp.add(new Process(34, 7000));
+		return temp;
+	}
 	public static void main(String args[]) {
 		/*System.out.println("Contiguos allocater thing");
 		Scanner sc = new Scanner(System.in);
@@ -206,6 +225,7 @@ public class ContigousMemoryAllocator {
 			System.exit(-1);
 		}
 		ContigousMemoryAllocator allocator = new ContigousMemoryAllocator(size);*/
+		int MemoryMax = -1, ProcSizeMax = -1, NumProc = -1, MaxProcTime = -1;
 		boolean fileNotChosen = true;
 		while(fileNotChosen)
 		{
@@ -213,7 +233,7 @@ public class ContigousMemoryAllocator {
 			FileNameExtensionFilter filter = new FileNameExtensionFilter("txt file", "txt");
 			chooser.setFileFilter(filter);
 			int returnVal = chooser.showOpenDialog(null);
-			int MemoryMax = -1, ProcSizeMax = -1, NumProc = -1, MaxProcTime = -1;
+			
 			if(returnVal == JFileChooser.APPROVE_OPTION) {
 				File file = chooser.getSelectedFile();
 				Scanner sc;
@@ -257,6 +277,12 @@ public class ContigousMemoryAllocator {
 				}
 			}
 		}
+		
+		ArrayList<Process> proc = generateProcesses(ProcSizeMax, NumProc, MaxProcTime);
+		for(Process p: proc) {
+			System.out.println(p.toString());
+		}
+		
 		Scanner sc = new Scanner(System.in);
 		while(true) {
 			
@@ -294,4 +320,6 @@ public class ContigousMemoryAllocator {
 			}
 		}
 	}
+
+
 }
