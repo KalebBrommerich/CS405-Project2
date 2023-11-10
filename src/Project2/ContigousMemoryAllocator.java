@@ -1,11 +1,14 @@
 package Project2;
-import java.awt.Taskbar.State;
+import java.io.File;
+import java.io.FileNotFoundException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
+import javax.swing.JFileChooser;
+import javax.swing.filechooser.FileNameExtensionFilter;
 
 public class ContigousMemoryAllocator {
 	private int size;    // maximum memory size in bytes (B)
@@ -140,8 +143,61 @@ public class ContigousMemoryAllocator {
 			i++;
 		}
 	}
+	
+	public static int convertToKB(String line[]) {
+		String unit = line[3].toLowerCase();
+		int value = Integer.parseInt(line[2]);
+		switch (unit) {
+	        case "bytes":
+	        case "byte":
+	        case "b":
+	            return value / 1024;
+	        case "kilobytes":
+	        case "kilobyte":
+	        case "kb":
+	            return value;
+	        case "megabytes":
+	        case "megabyte":
+	        case "mb":
+	            return value * 1024;
+	        case "gigabytes":
+	        case "gigabyte":
+	        case "gb":
+	            return value * 1024 * 1024;
+	        default:
+	            System.err.println("Unsupported unit: " + unit);
+	            return -1;
+		}
+	}
+	
+	public static int convertToMS(String line[]) {
+		String unit = line[3].toLowerCase();
+		int value = Integer.parseInt(line[2]);
+		switch (unit) {
+	        case "milliseconds":
+	        case "millisecond":
+	        case "ms":
+	            return value;
+	        case "seconds":
+	        case "second":
+	        case "s":
+	            return value * 1000;
+	        case "minutes":
+	        case "minute":
+	        case "min":
+	            return value * 60 * 1000;
+	        case "hours":
+	        case "hour":
+	        case "h":
+	            return value * 60 * 60 * 1000;
+	        default:
+	            System.err.println("Unsupported unit: " + unit);
+	            return -1;	
+		}
+	}
+	
 	public static void main(String args[]) {
-		System.out.println("Contiguos allocater thing");
+		/*System.out.println("Contiguos allocater thing");
 		Scanner sc = new Scanner(System.in);
 		System.out.println("Enter max physical mem size (KB)");
 		int size = sc.nextInt();
@@ -149,16 +205,70 @@ public class ContigousMemoryAllocator {
 			System.err.println("Invalid mem size");
 			System.exit(-1);
 		}
-		ContigousMemoryAllocator allocator = new ContigousMemoryAllocator(size);
+		ContigousMemoryAllocator allocator = new ContigousMemoryAllocator(size);*/
+		boolean fileNotChosen = true;
+		while(fileNotChosen)
+		{
+			JFileChooser chooser = new JFileChooser();
+			FileNameExtensionFilter filter = new FileNameExtensionFilter("txt file", "txt");
+			chooser.setFileFilter(filter);
+			int returnVal = chooser.showOpenDialog(null);
+			int MemoryMax = -1, ProcSizeMax = -1, NumProc = -1, MaxProcTime = -1;
+			if(returnVal == JFileChooser.APPROVE_OPTION) {
+				File file = chooser.getSelectedFile();
+				Scanner sc;
+				try {
+					sc = new Scanner(file);
+					while(sc.hasNextLine()) {
+						String line = sc.nextLine();
+						String arr[] = line.split(" ");
+						if(arr.length < 3) continue;
+						String key = arr[0].toUpperCase();
+						switch(key) {
+							case "MEMORY_MAX":
+								System.out.println("5");
+								if(arr.length < 4) continue;
+								MemoryMax = convertToKB(arr);
+								break;
+							case "PROC_SIZE_MAX":
+								if(arr.length < 4) continue;
+								ProcSizeMax = convertToKB(arr);
+								break;
+							case "NUM_PROC":
+								NumProc = Integer.parseInt(arr[2]);
+								break;
+							case "MAX_PROC_TIME":
+								if(arr.length < 4) continue;
+								MaxProcTime = convertToMS(arr);
+								break;
+							default:
+								System.out.println("The key {"+arr[0]+"} in the config file is not supported.");
+						}
+					}
+					if(MemoryMax == -1 || ProcSizeMax == -1 || NumProc == -1 || MaxProcTime == -1) {
+						System.out.println("The input file is missing an important parameter.");	
+					}
+					else {
+						fileNotChosen = false;
+					}
+				} catch (FileNotFoundException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+			}
+		}
+		Scanner sc = new Scanner(System.in);
 		while(true) {
+			
 			System.out.print("mmu>");
 			String command = sc.nextLine();
 			String arr[] = command.split(" ");
+			
 			if(arr[0].toLowerCase().equals("h")) {
-				allocator.print_help_message();
+				//allocator.print_help_message();
 			}
 			else if(arr[0].toLowerCase().equals("stat")) {
-				allocator.print_status();
+				//allocator.print_status();
 			}
 			else if(arr[0].toLowerCase().equals("exit")) {
 				break;
@@ -166,21 +276,21 @@ public class ContigousMemoryAllocator {
 			else if(arr[0].toLowerCase().equals("rq")) {
 				String process = arr[1];
 				int rqSize = Integer.parseInt(arr[2]);
-				if(allocator.first_fit(process, rqSize)>0) {
-					System.out.println("Succesfully allocated " + rqSize + " to " + process);
-				}
+				/*if(allocator.first_fit(process, rqSize)>0) {
+					//System.out.println("Succesfully allocated " + rqSize + " to " + process);
+				//}
 				else {
 					System.err.println("Couldn't allocate " + rqSize + " to " + process);
-				}
+				}*/
 			}
 			else if(arr[0].toLowerCase().equals("rl")){
 				String process = arr[1];
-				if(allocator.release(process)>0) {
-					System.out.println("Succesfully deallocated "+ process);
-				}
+				/*if(allocator.release(process)>0) {
+					//System.out.println("Succesfully deallocated "+ process);
+				//}
 				else {
 					System.err.println("Couldn't deallocate "+ process);
-				}
+				}*/
 			}
 		}
 	}
