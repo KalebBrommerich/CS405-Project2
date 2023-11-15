@@ -11,6 +11,7 @@ import java.util.Scanner;
 import javax.swing.JFileChooser;
 import javax.swing.filechooser.FileNameExtensionFilter;
 
+
 public class ContigousMemoryAllocator {
 	private int size; // maximum memory size in bytes (B)
 	private Map<String, Partition> allocMap; // map process to partition
@@ -91,6 +92,72 @@ public class ContigousMemoryAllocator {
 				break;
 			}
 			index++;
+		}
+		return alloc;
+	}
+	public int best_fit(String process, int size, int time) {
+		// TODO: add code below
+		// System.out.println("Start First Fit Method: size=" + size);
+		if (allocMap.containsKey(process))
+			return -1;// process allocated a partition already
+		int index = 0, alloc = -1, partSize = 9999999,candidateIndex=-1;
+		// System.out.println("Start While Loop in FFM");
+		while (index < partList.size()) {
+			Partition part = partList.get(index);
+			if (part.isbFree() && part.getLength() >= size) {
+				if(partSize>part.getLength()-size) {
+					partSize=part.getLength()-size;
+					candidateIndex=index;
+				}
+			}
+			index++;
+		}
+		if (candidateIndex>=0) {// found a good partition
+			Partition part = partList.get(candidateIndex);
+			Partition allocPart = new Partition(part.getBase(), size, time);
+			allocPart.setbFree(false);
+			allocPart.setProcess(process);
+			allocPart.setRemainingTime(time);
+			partList.add(index, allocPart);// insert this partition to list
+			allocMap.put(process, allocPart);
+			part.setBase(part.getBase() + size);
+			part.setLength(part.getLength() - size);
+			if (part.getLength() == 0)
+				partList.remove(part);
+			alloc = size;
+		}
+		return alloc;
+	}
+	public int worst_fit(String process, int size, int time) {
+		// TODO: add code below
+		// System.out.println("Start First Fit Method: size=" + size);
+		if (allocMap.containsKey(process))
+			return -1;// process allocated a partition already
+		int index = 0, alloc = -1, partSize = -1,candidateIndex=-1;
+		// System.out.println("Start While Loop in FFM");
+		while (index < partList.size()) {
+			Partition part = partList.get(index);
+			if (part.isbFree() && part.getLength() >= size) {
+				if(partSize<part.getLength()-size) {
+					partSize=part.getLength()-size;
+					candidateIndex=index;
+				}
+			}
+			index++;
+		}
+		if (candidateIndex>=0) {// found a good partition
+			Partition part = partList.get(candidateIndex);
+			Partition allocPart = new Partition(part.getBase(), size, time);
+			allocPart.setbFree(false);
+			allocPart.setProcess(process);
+			allocPart.setRemainingTime(time);
+			partList.add(index, allocPart);// insert this partition to list
+			allocMap.put(process, allocPart);
+			part.setBase(part.getBase() + size);
+			part.setLength(part.getLength() - size);
+			if (part.getLength() == 0)
+				partList.remove(part);
+			alloc = size;
 		}
 		return alloc;
 	}
@@ -307,7 +374,7 @@ public class ContigousMemoryAllocator {
 				String process = p.getProcName();
 				int rqSize = p.getProcSize();
 				int rqTime = p.getProcTime();
-				if (allocator.first_fit(process, rqSize, rqTime) > 0) {
+				if (allocator.best_fit(process, rqSize, rqTime) > 0) {
 					System.out.println("Succesfully allocated " + rqSize + " KB and " + rqTime + " ms to " + process);
 					proc.remove(p);
 					currentProcesses.add(p);
