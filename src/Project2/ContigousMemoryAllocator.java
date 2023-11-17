@@ -2,6 +2,7 @@ package Project2;
 
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -10,7 +11,6 @@ import java.util.Map;
 import java.util.Scanner;
 import javax.swing.JFileChooser;
 import javax.swing.filechooser.FileNameExtensionFilter;
-
 
 public class ContigousMemoryAllocator {
 	private int size; // maximum memory size in bytes (B)
@@ -36,6 +36,28 @@ public class ContigousMemoryAllocator {
 					part.getBase() + part.getLength() - 1, part.isbFree() ? "Free" : part.getProcess(),
 					part.getLength(), part.getRemainingTime());
 		}
+	}
+
+	// print the number of holes, the average size of the holes,
+	// total size of all of the holes, and the percentage of total free memory
+	// partition over the total memory
+	public void print_stats() {
+		DecimalFormat df = new DecimalFormat("#.00");
+		int numHoles = 0;
+		int holeSize = 0;
+		int totalHoleSize = 0;
+		for (Partition part : partList) {
+			if (part.isbFree()) {
+				numHoles++;
+				holeSize = part.getLength();
+				totalHoleSize += holeSize;
+			}
+		}
+		System.out.println("Holes: " + numHoles);
+		System.out.println("Average: " + totalHoleSize / numHoles + " KB");
+		System.out.println("Total: " + totalHoleSize + " KB");
+		System.out.println("Percent: " + df.format((double) totalHoleSize / (double) size * 100) + "%");
+
 	}
 
 	// get the size of total allocated memory
@@ -69,11 +91,9 @@ public class ContigousMemoryAllocator {
 	// implements the first fit memory allocation algorithm
 	public int first_fit(String process, int size, int time) {
 		// TODO: add code below
-		// System.out.println("Start First Fit Method: size=" + size);
 		if (allocMap.containsKey(process))
 			return -1;// process allocated a partition already
 		int index = 0, alloc = -1;
-		// System.out.println("Start While Loop in FFM");
 		while (index < partList.size()) {
 			Partition part = partList.get(index);
 			// part.getLength is the size of the partitions
@@ -95,24 +115,25 @@ public class ContigousMemoryAllocator {
 		}
 		return alloc;
 	}
+
 	public int best_fit(String process, int size, int time) {
 		// TODO: add code below
 		// System.out.println("Start First Fit Method: size=" + size);
 		if (allocMap.containsKey(process))
 			return -1;// process allocated a partition already
-		int index = 0, alloc = -1, partSize = 9999999,candidateIndex=-1;
+		int index = 0, alloc = -1, partSize = 9999999, candidateIndex = -1;
 		// System.out.println("Start While Loop in FFM");
 		while (index < partList.size()) {
 			Partition part = partList.get(index);
 			if (part.isbFree() && part.getLength() >= size) {
-				if(partSize>part.getLength()-size) {
-					partSize=part.getLength()-size;
-					candidateIndex=index;
+				if (partSize > part.getLength() - size) {
+					partSize = part.getLength() - size;
+					candidateIndex = index;
 				}
 			}
 			index++;
 		}
-		if (candidateIndex>=0) {// found a good partition
+		if (candidateIndex >= 0) {// found a good partition
 			Partition part = partList.get(candidateIndex);
 			Partition allocPart = new Partition(part.getBase(), size, time);
 			allocPart.setbFree(false);
@@ -128,24 +149,25 @@ public class ContigousMemoryAllocator {
 		}
 		return alloc;
 	}
+
 	public int worst_fit(String process, int size, int time) {
 		// TODO: add code below
 		// System.out.println("Start First Fit Method: size=" + size);
 		if (allocMap.containsKey(process))
 			return -1;// process allocated a partition already
-		int index = 0, alloc = -1, partSize = -1,candidateIndex=-1;
+		int index = 0, alloc = -1, partSize = -1, candidateIndex = -1;
 		// System.out.println("Start While Loop in FFM");
 		while (index < partList.size()) {
 			Partition part = partList.get(index);
 			if (part.isbFree() && part.getLength() >= size) {
-				if(partSize<part.getLength()-size) {
-					partSize=part.getLength()-size;
-					candidateIndex=index;
+				if (partSize < part.getLength() - size) {
+					partSize = part.getLength() - size;
+					candidateIndex = index;
 				}
 			}
 			index++;
 		}
-		if (candidateIndex>=0) {// found a good partition
+		if (candidateIndex >= 0) {// found a good partition
 			Partition part = partList.get(candidateIndex);
 			Partition allocPart = new Partition(part.getBase(), size, time);
 			allocPart.setbFree(false);
@@ -160,6 +182,11 @@ public class ContigousMemoryAllocator {
 			alloc = size;
 		}
 		return alloc;
+	}
+	
+	public int next_fit(String process, int size, int time) {
+		//the -1 is temporary so no errors show up
+		return -1;
 	}
 
 	// release the allocated memory of a process
@@ -182,28 +209,28 @@ public class ContigousMemoryAllocator {
 		return size;
 	}
 
+	private void adjustAddresses(int index, int adjustSize) {
+		for (int i = index; i < partList.size(); i++) {
+			partList.get(i).setBase(partList.get(i).getBase() - adjustSize);
+		}
+
+	}
+
 	// procedure to merge adjacent holes
 	private void merge_holes() {
-		// TODO: add code below
 		order_partitions();
 		int i = 0;
 		while (i < partList.size() - 1) {
 			Partition part = partList.get(i);
-			if (part.isbFree()) {
-				int endAddr = part.getBase() + part.getLength() - 1;
-				int j = i + 1;
-				while (j < partList.size() && partList.get(j).isbFree()) {
-					// merge j into i
-
-					int startj = partList.get(j).getBase();
-					if (startj == endAddr + 1) {
-						part.setLength((part.getLength() + partList.get(j).getLength()));
-						partList.remove(partList.get(j));
+			if (part.isbFree()) {// at i
+				for (int j = i + 1; j < partList.size(); j++) {
+					if (partList.get(j).isbFree()) {
+						partList.get(j).setLength((part.getLength() + partList.get(j).getLength()));
+						int adjustSize = part.getLength();
+						partList.remove(part);
 						System.out.println("merge");
-						endAddr = part.getBase() + part.getLength() - 1;
-						continue;
+						adjustAddresses(i, adjustSize);
 					}
-					j++;
 				}
 			}
 			i++;
@@ -264,11 +291,10 @@ public class ContigousMemoryAllocator {
 
 	private static ArrayList<Process> generateProcesses(int procSizeMax, int numProc, int maxProcTime) {
 		ArrayList<Process> temp = new ArrayList<Process>();
-		for (int i = 0; i < numProc; i++) {
-			// round MS to Seconds
-			 temp.add(new
-			 Process("P" + i+1, (int)(Math.random()*procSizeMax),(int)Math.round((Math.random()*maxProcTime)
-			 + 500) / 1000 * 1000));
+
+		for (int i = 0; i < numProc; i++) { // round MS to Seconds
+			temp.add(new Process("P" + i, (int) (Math.random() * procSizeMax),
+					(int) Math.round((Math.random() * (maxProcTime - 500)) + 500)));
 		}
 		return temp;
 	}
@@ -303,7 +329,6 @@ public class ContigousMemoryAllocator {
 						String key = arr[0].toUpperCase();
 						switch (key) {
 						case "MEMORY_MAX":
-							// System.out.println("5");
 							if (arr.length < 4)
 								continue;
 							MemoryMax = convertToKB(arr);
@@ -342,7 +367,11 @@ public class ContigousMemoryAllocator {
 				}
 			}
 		}
-
+		
+		Scanner sc = new Scanner(System.in);
+		System.out.print("Choose a memory allocation algorithm (0 - Best Fit, 1 - Worst Fit, 2 - Next Fit, 3 - First Fit):");
+		int memAlgo = sc.nextInt();
+		sc.close();
 		ArrayList<Process> proc = generateProcesses(ProcSizeMax, NumProc, MaxProcTime);
 		for (Process p : proc) {
 			// print the randomly generated processes and their attributes
@@ -350,7 +379,6 @@ public class ContigousMemoryAllocator {
 		}
 
 		ContigousMemoryAllocator allocator = new ContigousMemoryAllocator(size);
-		Scanner sc = new Scanner(System.in);
 		ArrayList<Process> procClone = new ArrayList<>(proc);
 		ArrayList<Process> currentProcesses = new ArrayList<>();
 		ArrayList<Process> finishedProcesses = new ArrayList<>();
@@ -364,25 +392,59 @@ public class ContigousMemoryAllocator {
 					if (allocator.release(p.getProcName()) > 0) {
 						System.out.println("Succesfully deallocated " + p.getProcName());
 						finishedProcesses.add(p);
-					} else {
-						System.err.println("Couldn't deallocate " + p.getProcName());
 					}
 				}
 			}
 			// allocate partitions
 			for (Process p : procClone) {
 				String process = p.getProcName();
-				int rqSize = p.getProcSize();
-				int rqTime = p.getProcTime();
-				if (allocator.best_fit(process, rqSize, rqTime) > 0) {
-					System.out.println("Succesfully allocated " + rqSize + " KB and " + rqTime + " ms to " + process);
-					proc.remove(p);
-					currentProcesses.add(p);
-				} else {
-					System.err.println("Couldn't allocate " + rqSize + " KB and " + rqTime + " ms to " + process);
+				int Size = p.getProcSize();
+				int Time = p.getProcTime();
+				switch (memAlgo) {
+				case 0:
+					if (allocator.best_fit(process, Size, Time) > 0) {
+						System.out.println("Succesfully allocated " + Size + " KB and " + Time + " ms to " + process);
+						proc.remove(p);
+						currentProcesses.add(p);
+					} else {
+						System.err.println("Couldn't allocate " + Size + " KB and " + Time + " ms to " + process);
+					}
+					break;
+				case 1:
+					if (allocator.worst_fit(process, Size, Time) > 0) {
+						System.out.println("Succesfully allocated " + Size + " KB and " + Time + " ms to " + process);
+						proc.remove(p);
+						currentProcesses.add(p);
+					} else {
+						System.err.println("Couldn't allocate " + Size + " KB and " + Time + " ms to " + process);
+					}
+					break
+					;
+				case 2:
+					if (allocator.next_fit(process, Size, Time) > 0) {
+						System.out.println("Succesfully allocated " + Size + " KB and " + Time + " ms to " + process);
+						proc.remove(p);
+						currentProcesses.add(p);
+					} else {
+						System.err.println("Couldn't allocate " + Size + " KB and " + Time + " ms to " + process);
+					}
+					break;
+				case 3:
+						if (allocator.first_fit(process, Size, Time) > 0) {
+							System.out.println("Succesfully allocated " + Size + " KB and " + Time + " ms to " + process);
+							proc.remove(p);
+							currentProcesses.add(p);
+						} else {
+							System.err.println("Couldn't allocate " + Size + " KB and " + Time + " ms to " + process);
+						}
+						break;
+						default:
+							System.err.println("Invalid input");
+							System.exit(-1);
 				}
 			}
 			allocator.print_status();
+			allocator.print_stats();
 			procClone = new ArrayList<>(proc);
 			allocator.decrementTime();
 			try {
