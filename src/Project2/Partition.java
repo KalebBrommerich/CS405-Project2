@@ -57,6 +57,7 @@ public class Partition {
 		this.process = null; // unallocated to any process
 	}
 
+	@Override
 	public String toString() {
 		return "Partition [base=" + base + ", length=" + length + ", bFree=" + bFree + ", process=" + process + "]";
 
