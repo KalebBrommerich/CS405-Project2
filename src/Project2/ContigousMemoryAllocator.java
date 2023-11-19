@@ -1,5 +1,6 @@
 package Project2;
 
+import java.awt.Color;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.text.DecimalFormat;
@@ -8,30 +9,17 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Scanner;
-
-import javax.swing.JFileChooser;
-import javax.swing.filechooser.FileNameExtensionFilter;
-import com.sun.jna.Native;
-import com.sun.jna.platform.win32.User32;
-import com.sun.jna.platform.win32.WinDef;
-import com.sun.jna.platform.win32.WinDef.LRESULT;
-import com.sun.jna.platform.win32.WinDef.WPARAM;
-import com.sun.jna.platform.win32.WinUser;
-import com.sun.jna.platform.win32.WinUser.HHOOK;
-import com.sun.jna.platform.win32.WinUser.KBDLLHOOKSTRUCT;
-import com.sun.jna.Pointer;
 
 public class ContigousMemoryAllocator {
-	private int size; // maximum memory size in bytes (B)
+	public int size; // maximum memory size in bytes (B)
 	private Map<String, Partition> allocMap; // map process to partition
-	private List<Partition> partList; // list of memory partitions
-
-	private static ContigousMemoryAllocator allocator;
-	private static ArrayList<Process> procClone;
-	private static ArrayList<Process> currentProcesses;
-	private static ArrayList<Process> finishedProcesses;
-	private static ArrayList<Process> proc;
+	public List<Partition> partList; // list of memory partitions
+	public boolean isCompact = false;
+	public ArrayList<Process> procClone;
+	public ArrayList<Process> currentProcesses;
+	public ArrayList<Process> finishedProcesses;
+	public ArrayList<Process> proc;
+	private static UserInterface ui;
 	// constructor
 
 	public ContigousMemoryAllocator(int size) {
@@ -46,11 +34,11 @@ public class ContigousMemoryAllocator {
 	public void print_status() {
 		// TODO: add code below
 		order_partitions();
-		System.out.printf("Paritions [Allocated=%d KB, Free=%d KB \n", allocated_memory(), free_memory());
+		//System.out.printf("Paritions [Allocated=%d KB, Free=%d KB \n", allocated_memory(), free_memory());
+		ui.Println("Partitions [Allocated="+allocated_memory()+", Free="+free_memory()+"]", Color.yellow);
 		for (Partition part : partList) {
-			System.out.printf("Address [%d:%d] %s (%d KB) {%d ms}\n", part.getBase(),
-					part.getBase() + part.getLength() - 1, part.isbFree() ? "Free" : part.getProcess(),
-					part.getLength(), part.getRemainingTime());
+			ui.Println("Address " + "[" + part.getBase() + ":" + part.getBase() + part.getLength() + "] " + (part.isbFree() ? "Free" : part.getProcess())
+					+ " ("+part.getLength() + ")" + " {" + part.getRemainingTime() + "}", Color.yellow);
 		}
 	}
 
@@ -69,11 +57,11 @@ public class ContigousMemoryAllocator {
 				totalHoleSize += holeSize;
 			}
 		}
-		System.out.println("Holes: " + numHoles);
-		if(numHoles == 0)  System.out.println("Average: 0 KB"); // NOT SURE IF THIS FIX DIVISION BY 0
-		else System.out.println("Average: " + totalHoleSize / numHoles + " KB");
-		System.out.println("Total: " + totalHoleSize + " KB");
-		System.out.println("Percent: " + df.format((double) totalHoleSize / (double) size * 100) + "%");
+		ui.Println("Holes: " + numHoles, Color.orange);
+		if(numHoles == 0)  ui.Println("Average: 0 KB", Color.orange); // NOT SURE IF THIS FIX DIVISION BY 0
+		else ui.Println("Average: " + totalHoleSize / numHoles + " KB", Color.orange);
+		ui.Println("Total: " + totalHoleSize + " KB", Color.orange);
+		ui.Println("Percent: " + df.format((double) totalHoleSize / (double) size * 100) + "%", Color.orange);
 
 	}
 
@@ -270,7 +258,6 @@ public class ContigousMemoryAllocator {
 					part.setLength(part.getLength() + part1.getLength());
 					//int adjustSize = part.getLength();
 					partList.remove(part1);
-					System.out.println("merge");
 					i--;
 				}
 			}
@@ -289,7 +276,6 @@ public class ContigousMemoryAllocator {
 						partList.get(j).setLength((part.getLength() + partList.get(j).getLength()));
 						int adjustSize = part.getLength();
 						partList.remove(part);
-						System.out.println("merge");
 						adjustAddresses(i, adjustSize);
 					}
 				}
@@ -298,59 +284,9 @@ public class ContigousMemoryAllocator {
 		}
 	}
 
-	public static int convertToKB(String line[]) {
-		String unit = line[3].toLowerCase();
-		int value = Integer.parseInt(line[2]);
-		switch (unit) {
-		case "bytes":
-		case "byte":
-		case "b":
-			return value / 1024;
-		case "kilobytes":
-		case "kilobyte":
-		case "kb":
-			return value;
-		case "megabytes":
-		case "megabyte":
-		case "mb":
-			return value * 1024;
-		case "gigabytes":
-		case "gigabyte":
-		case "gb":
-			return value * 1024 * 1024;
-		default:
-			System.err.println("Unsupported unit: " + unit);
-			return -1;
-		}
-	}
 
-	public static int convertToMS(String line[]) {
-		String unit = line[3].toLowerCase();
-		int value = Integer.parseInt(line[2]);
-		switch (unit) {
-		case "milliseconds":
-		case "millisecond":
-		case "ms":
-			return value;
-		case "seconds":
-		case "second":
-		case "s":
-			return value * 1000;
-		case "minutes":
-		case "minute":
-		case "min":
-			return value * 60 * 1000;
-		case "hours":
-		case "hour":
-		case "h":
-			return value * 60 * 60 * 1000;
-		default:
-			System.err.println("Unsupported unit: " + unit);
-			return -1;
-		}
-	}
 
-	private static ArrayList<Process> generateProcesses(int procSizeMax, int numProc, int maxProcTime) {
+	public ArrayList<Process> generateProcesses(int procSizeMax, int numProc, int maxProcTime) {
 		ArrayList<Process> temp = new ArrayList<>();
 
 		for (int i = 0; i < numProc; i++) { // round MS to Seconds
@@ -368,49 +304,20 @@ public class ContigousMemoryAllocator {
 		}
 	}
 
-	private static boolean Paused = true;
-	private static boolean isFinished = false;
-	private static int steps = 0;
-	private static int memAlgo = 0;
-	private static Object lock = new Object();
-	private static class KeyboardProc implements WinUser.LowLevelKeyboardProc{
-		@Override
-		public WinDef.LRESULT callback(int nCode, WinDef.WPARAM wParam, WinUser.KBDLLHOOKSTRUCT lParam) {
-			// TODO Auto-generated method stub
-			if(nCode >= 0) {
-				int vkCode = lParam.vkCode;
-				int eventType = wParam.intValue();
-				System.out.println("nCode: " + nCode);
-				//If the press was space key
-				if(vkCode == 32) {
-					if(eventType == WinUser.WM_KEYUP) {
-						Paused = !Paused;
-						System.out.println("pressed");
-						synchronized(lock) {
-							lock.notify();
-						}
-					}
-				}
-				
-				if(vkCode == 'S' || vkCode == 's') {
-					if(eventType == WinUser.WM_KEYUP) {
-						steps++;
-						synchronized(lock) {
-							lock.notify();
-						}
-					}
-				}
-			}
-			return User32.INSTANCE.CallNextHookEx(null, nCode, wParam, new WinDef.LPARAM(Pointer.nativeValue(lParam.getPointer())));
-		}
-	}
+	public boolean Paused = true;
+	public boolean isFinished = false;
+	public int steps = 0;
+	public int memAlgo = 0;
+	public Object lock = new Object();
+	public static Object dataLock = new Object();
+	public boolean canStep = true;
 	
 	public void UserInterfaceStep() {
-		boolean isPlaying = false;
+		//boolean isPlaying = false;
 		synchronized(lock) {
 			while(Paused && steps == 0) {
 				try {
-					System.out.println("[Space]:Play/Pause\n[s]:Step");
+					ui.Println("Press play\nor Press step", Color.WHITE);
 					lock.wait();
 				} catch (InterruptedException e) {
 					// TODO Auto-generated catch block
@@ -418,15 +325,15 @@ public class ContigousMemoryAllocator {
 				}
 			}
 		}
-		
-		while((!Paused || steps > 0 || isPlaying) && (proc.size() > 0 || currentProcesses.size() > 0)) {
-			System.out.println("Proc size: " + proc.size() + ", current proc size: " + currentProcesses.size());
+		canStep = false;
+		while((!Paused || steps > 0) && (proc.size() > 0 || currentProcesses.size() > 0)) {
+			ui.Println("Proc size: " + proc.size() + ", current proc size: " + currentProcesses.size(), Color.pink);
 			if(steps != 0) steps--;
 			if (currentProcesses.size() > 0) {
 				for(int i = 0; i < currentProcesses.size(); i++) {
 					Process p = currentProcesses.get(i);
-					if (allocator.release(p.getProcName()) > 0) {
-						System.out.println("Succesfully deallocated " + p.getProcName());
+					if (release(p.getProcName()) > 0) {
+						ui.Println("Succesfully deallocated " + p.getProcName(), Color.green);
 						finishedProcesses.add(p);
 						currentProcesses.remove(i);
 					}
@@ -439,52 +346,54 @@ public class ContigousMemoryAllocator {
 				int Time = p.getProcTime();
 				switch (memAlgo) {
 				case 0:
-					if (allocator.best_fit(process, Size, Time) > 0) {
-						System.out.println("Succesfully allocated " + Size + " KB and " + Time + " ms to " + process);
+					if (best_fit(process, Size, Time) > 0) {
+						ui.Println("Succesfully allocated " + Size + " KB and " + Time + " ms to " + process, Color.green);
 						proc.remove(p);
 						currentProcesses.add(p);
 					} else {
-						System.err.println("Couldn't allocate " + Size + " KB and " + Time + " ms to " + process);
+						ui.Println("Couldn't allocate " + Size + " KB and " + Time + " ms to " + process, Color.RED);
 					}
 					break;
 				case 1:
-					if (allocator.worst_fit(process, Size, Time) > 0) {
-						System.out.println("Succesfully allocated " + Size + " KB and " + Time + " ms to " + process);
+					if (worst_fit(process, Size, Time) > 0) {
+						ui.Println("Succesfully allocated " + Size + " KB and " + Time + " ms to " + process, Color.green);
 						proc.remove(p);
 						currentProcesses.add(p);
 					} else {
-						System.err.println("Couldn't allocate " + Size + " KB and " + Time + " ms to " + process);
+						ui.Println("Couldn't allocate " + Size + " KB and " + Time + " ms to " + process, Color.RED);
 					}
 					break
 					;
 				case 2:
-					if (allocator.next_fit(process, Size, Time) > 0) {
-						System.out.println("Succesfully allocated " + Size + " KB and " + Time + " ms to " + process);
+					if (next_fit(process, Size, Time) > 0) {
+						ui.Println("Succesfully allocated " + Size + " KB and " + Time + " ms to " + process, Color.green);
 						proc.remove(p);
 						currentProcesses.add(p);
 					} else {
-						System.err.println("Couldn't allocate " + Size + " KB and " + Time + " ms to " + process);
+						ui.Println("Couldn't allocate " + Size + " KB and " + Time + " ms to " + process, Color.RED);
 					}
 					break;
 				case 3:
-						if (allocator.first_fit(process, Size, Time) > 0) {
-							System.out.println("Succesfully allocated " + Size + " KB and " + Time + " ms to " + process);
+						if (first_fit(process, Size, Time) > 0) {
+							ui.Println("Succesfully allocated " + Size + " KB and " + Time + " ms to " + process, Color.green);
 							proc.remove(p);
 							currentProcesses.add(p);
 						} else {
-							System.err.println("Couldn't allocate " + Size + " KB and " + Time + " ms to " + process);
+							ui.Println("Couldn't allocate " + Size + " KB and " + Time + " ms to " + process, Color.RED);
 						}
 						break;
 						default:
-							System.err.println("Invalid input");
+							ui.Println("Invalid input", Color.RED);
 							System.exit(-1);
 				}
 			}
-			allocator.merge_adj_holes();
-			allocator.print_status();
-			allocator.print_stats();
+			if(!isCompact) merge_adj_holes();
+			else merge_holes();
+			print_status();
+			print_stats();
 			procClone = new ArrayList<>(proc);
-			allocator.decrementTime();
+			decrementTime();
+			ui.mv.repaint();
 			try {
 				Thread.sleep(1000);
 			} catch (InterruptedException e) {
@@ -492,97 +401,12 @@ public class ContigousMemoryAllocator {
 				e.printStackTrace();
 			}
 		}
-		if(proc.size() == 0 && currentProcesses.size() == 0)
-			isFinished = true;
+		canStep = true;
+		if(proc.size() != 0 || currentProcesses.size() != 0)
+			ui.createNewUserInterfaceThread();
 	}
-
-	public synchronized void UserInput() {
-
-	}
-
+	
 	public static void main(String args[]) {
-		int MemoryMax = -1, ProcSizeMax = -1, NumProc = -1, MaxProcTime = -1, size = -1;
-		boolean fileNotChosen = true;
-		while (fileNotChosen) {
-			JFileChooser chooser = new JFileChooser();
-			FileNameExtensionFilter filter = new FileNameExtensionFilter("txt file", "txt");
-			chooser.setFileFilter(filter);
-			int returnVal = chooser.showOpenDialog(null);
-
-			if (returnVal == JFileChooser.APPROVE_OPTION) {
-				File file = chooser.getSelectedFile();
-				Scanner scr;
-				try {
-					scr = new Scanner(file);
-					while (scr.hasNextLine()) {
-						String line = scr.nextLine();
-						String arr[] = line.split(" ");
-						if (arr.length < 3 || !arr[1].equals("="))
-							continue;
-						String key = arr[0].toUpperCase();
-						switch (key) {
-						case "MEMORY_MAX":
-							if (arr.length < 4)
-								continue;
-							MemoryMax = convertToKB(arr);
-							size = MemoryMax;
-							System.out.println("Memory Max: " + MemoryMax);
-							break;
-						case "PROC_SIZE_MAX":
-							if (arr.length < 4)
-								continue;
-							ProcSizeMax = convertToKB(arr);
-							System.out.println("Proc_Size_Max: " + ProcSizeMax);
-							break;
-						case "NUM_PROC":
-							NumProc = Integer.parseInt(arr[2]);
-							System.out.println("Num Proc: " + NumProc);
-							break;
-						case "MAX_PROC_TIME":
-							if (arr.length < 4)
-								continue;
-							MaxProcTime = convertToMS(arr);
-							System.out.println("Max Proc Time: " + MaxProcTime);
-							break;
-						default:
-							System.out.println("The key {" + arr[0] + "} in the config file is not supported.");
-						}
-					}
-					scr.close();
-					if (MemoryMax == -1 || ProcSizeMax == -1 || NumProc == -1 || MaxProcTime == -1) {
-						System.out.println("The input file is missing an important parameter.");
-					} else {
-						fileNotChosen = false;
-					}
-				} catch (FileNotFoundException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-				}
-			}
-		}
-
-		Scanner sc = new Scanner(System.in);
-		System.out.print("Choose a memory allocation algorithm (0 - Best Fit, 1 - Worst Fit, 2 - Next Fit, 3 - First Fit):");
-		memAlgo = sc.nextInt();
-		sc.close();
-		proc = generateProcesses(ProcSizeMax, NumProc, MaxProcTime);
-		for (Process p : proc) {
-			// print the randomly generated processes and their attributes
-			System.out.println(p.toString());
-		}
-
-		allocator = new ContigousMemoryAllocator(size);
-		procClone = new ArrayList<>(proc);
-		currentProcesses = new ArrayList<>();
-		finishedProcesses = new ArrayList<>();
-		
-		User32 user32 = User32.INSTANCE;
-		HHOOK hhk = user32.SetWindowsHookEx(WinUser.WH_KEYBOARD_LL, new KeyboardProc(), null, 0);
-		Runtime.getRuntime().addShutdownHook(new Thread(() -> user32.UnhookWindowsHookEx(hhk)));
-		System.out.println("Waiting after thread made");
-		Paused = false;
-		while(!isFinished) {
-			allocator.UserInterfaceStep();
-		}
+		ui = new UserInterface();
 	}
 }
