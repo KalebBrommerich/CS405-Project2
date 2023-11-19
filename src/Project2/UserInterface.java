@@ -34,7 +34,7 @@ import javax.swing.filechooser.FileNameExtensionFilter;
 import javax.swing.text.BadLocationException;
 import javax.swing.text.DefaultHighlighter;
 import javax.swing.text.Highlighter;
-
+import javax.swing.text.Highlighter.Highlight;
 import javax.swing.JScrollPane;
 
 public class UserInterface extends JFrame {
@@ -56,19 +56,22 @@ public class UserInterface extends JFrame {
 	    }
 	}
 	private File file;
+	boolean isResetRequested = false;
 	private int MemoryMax = -1, ProcSizeMax = -1, NumProc = -1, MaxProcTime = -1, size = -1;
 	private Object memAlgLock = new Object();
 	private boolean algorithmChosen = false, compactChosen = false;
 	private JTextArea output;
-	private int lineindex = 0;
 	private JScrollPane scroller;
 	private ContigousMemoryAllocator allocator;
-	private JButton play, step, reset, tmp1, tmp2;
+	private JButton play, step, reset, newFile, help;
 	private ArrayList<Pair<Integer, Integer>> HighlightCoords = new ArrayList<Pair<Integer, Integer>>();
 	private ArrayList<Color> HighlightColors = new ArrayList<Color>();
 	public MemoryVisual mv; 
 	boolean isPartListDefined = false;
+	public Object ResetLock = new Object();
 	private Object CompactLock = new Object();
+	private boolean isHelpOpen = false;
+	String currentButtons[] = new String[5];
 	public UserInterface() {
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setSize(722, 434); // Set initial size
@@ -92,7 +95,7 @@ public class UserInterface extends JFrame {
         gbc.weighty = 1;
         gbc.fill = GridBagConstraints.BOTH;
         mainPanel.add(scroller, gbc);
-        mv = new MemoryVisual(Color.RED, 138, 360, "Memory");
+        mv = new MemoryVisual(Color.RED, 200, 360, "Memory");
         gbc.gridwidth = 3;
         gbc.gridx = 8;
         mainPanel.add(mv, gbc);
@@ -114,46 +117,203 @@ public class UserInterface extends JFrame {
         gbc.gridx = 4;
         mainPanel.add(reset, gbc);
         
-        tmp1 = new JButton("3");
+        newFile = new JButton("3");
         gbc.gridx = 6;
-        mainPanel.add(tmp1, gbc);
+        mainPanel.add(newFile, gbc);
         
-        tmp2 = new JButton("-");
+        help = new JButton("Help");
         gbc.gridx = 8;
-        mainPanel.add(tmp2, gbc);
+        mainPanel.add(help, gbc);
         
         add(mainPanel);
         play.addActionListener(new SpecialActionListener());
         step.addActionListener(new SpecialActionListener());
         reset.addActionListener(new SpecialActionListener());
-        tmp1.addActionListener(new SpecialActionListener());
-        tmp2.addActionListener(new SpecialActionListener());
+        newFile.addActionListener(new SpecialActionListener());
+        help.addActionListener(new SpecialActionListener());
         setVisible(true);
         // Set the frame to be visible
         setUpAllocator();
     }
 	
+	public class SpecialActionListener implements ActionListener{
+
+		@Override
+		public void actionPerformed(ActionEvent e) {
+			// TODO Auto-generated method stub
+			JButton source = (JButton)e.getSource();
+			boolean setButtonTextCompact = false, setButtonTextNormal = false;
+			if(source == play) {
+				if(isHelpOpen) return;
+				if(!algorithmChosen) {
+					allocator.memAlgo = 0;
+					algorithmChosen = true;
+					synchronized(memAlgLock) {
+						memAlgLock.notify();
+					}
+					setButtonTextCompact = true;
+				}
+				else if(!compactChosen) {
+					allocator.isCompact = true;
+					compactChosen = true;
+					synchronized(CompactLock) {
+						CompactLock.notify();
+					}
+					setButtonTextNormal = true;
+				}
+				else {
+					allocator.Paused = !allocator.Paused;
+					if(allocator.Paused) play.setText("Play");
+					else play.setText("Pause");
+					synchronized(allocator.lock) {
+						allocator.lock.notify();
+					}
+				}
+			}
+			else if(source  == step) {
+				if(isHelpOpen) return;
+				if(!algorithmChosen) {
+					allocator.memAlgo = 1;
+					algorithmChosen = true;
+					synchronized(memAlgLock) {
+						memAlgLock.notify();
+					}
+					setButtonTextCompact = true;
+				}
+				else if(!compactChosen) {
+					allocator.isCompact = false;
+					compactChosen = true;
+					synchronized(CompactLock) {
+						CompactLock.notify();
+					}
+					setButtonTextNormal = true;
+				}
+				else {
+					if(!allocator.Paused) return;
+					allocator.steps++;
+					synchronized(allocator.lock){
+						allocator.lock.notify();
+					}
+				}
+			}
+			else if(source == reset) {
+				if(isHelpOpen) return;
+				System.out.println("Detected");
+				if(!algorithmChosen) {
+					allocator.memAlgo = 2;
+					algorithmChosen = true;
+					synchronized(memAlgLock) {
+						memAlgLock.notify();
+					}
+					setButtonTextCompact = true;
+				}
+				else if(!compactChosen) return;
+				else {
+					new Thread(() -> reset()).start();
+				}
+			}
+			else if(source == newFile) {
+				if(isHelpOpen) return;
+				if(!algorithmChosen) {
+					allocator.memAlgo = 3;
+					algorithmChosen = true;
+					synchronized(memAlgLock) {
+						memAlgLock.notify();
+					}
+					setButtonTextCompact = true;
+				}
+				else if(!compactChosen) return;
+				else {
+					new Thread(() -> newFile()).start();
+				}
+			}
+			else {
+				if(isHelpOpen) {
+					isHelpOpen = false;
+					play.setText(currentButtons[0].equals("Pause")?"Play":currentButtons[0]);
+					step.setText(currentButtons[1]);
+					reset.setText(currentButtons[2]);
+					newFile.setText(currentButtons[3]);
+					help.setText(currentButtons[4]);
+					new Thread(() -> endHelp()).start();
+				}
+				else {
+					isHelpOpen = true;
+					currentButtons[0] = play.getText();
+					currentButtons[1] = step.getText();
+					currentButtons[2] = reset.getText();
+					currentButtons[3] = newFile.getText();
+					currentButtons[4] = help.getText();
+					new Thread(() -> help()).start();
+				}
+			}
+			
+			if(setButtonTextCompact) {
+				play.setText("yes");
+				step.setText("no");
+				reset.setText("-");
+				newFile.setText("-");
+				help.setText("Help");
+			}
+			else if(setButtonTextNormal) {
+				play.setText("Play");
+				step.setText("Step");
+				reset.setText("Reset");
+				newFile.setText("New File");
+				help.setText("Help");
+			}
+		}
+		
+	}
+	private void reset() {
+		KillAllocatorThread();
+		ResetAlgorithmAndSelection();
+	}
+	
+	private void newFile() {
+		KillAllocatorThread();
+		setUpFile();
+		ResetAlgorithmAndSelection();
+	}
+	
+	private void KillAllocatorThread() {
+		isResetRequested = true;
+		allocator.Paused = true;
+		allocator.steps = 0;
+		while(!allocator.canStep) {
+			synchronized(ResetLock) {
+				try {
+					ResetLock.wait();
+				} catch (InterruptedException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+			}
+		}
+		allocator.currentProcesses.clear();
+		allocator.proc.clear();
+		synchronized(allocator.resetLock) {
+			allocator.resetLock.notify();	
+		}
+		isResetRequested = false;
+	}
+	
 	private void ResetAlgorithmAndSelection() {
 		// TODO Auto-generated method stub
-		System.out.println("Here");
 		play.setText("0");
 		step.setText("1");
 		reset.setText("2");
-		tmp1.setText("3");
-		tmp2.setText("-");
+		newFile.setText("3");
+		help.setText("Help");
 		output.setText("");
 		HighlightColors.clear();
 		HighlightCoords.clear();
-		allocator.Paused = true;
-		allocator.steps = 0;
+		
 		algorithmChosen = false;
 		compactChosen = false;
 		isPartListDefined = false;
-		System.out.println("Here3");
-		repaint();
 		Println("Choose a memory allocation algorithm\n(0 - Best Fit, 1 - Worst Fit, 2 - Next Fit, 3 - First Fit)", Color.WHITE);
-
-		System.out.println("Here4");
+		
 		allocator = new ContigousMemoryAllocator(size);
 		while(!algorithmChosen) {
 			synchronized(memAlgLock) {
@@ -195,106 +355,6 @@ public class UserInterface extends JFrame {
 		t.start();
 	}
 	
-	public class SpecialActionListener implements ActionListener{
-
-		@Override
-		public void actionPerformed(ActionEvent e) {
-			// TODO Auto-generated method stub
-			JButton source = (JButton)e.getSource();
-			boolean setButtonTextCompact = false, setButtonTextNormal = false;
-			if(source == play) {
-				if(!algorithmChosen) {
-					allocator.memAlgo = 0;
-					algorithmChosen = true;
-					synchronized(memAlgLock) {
-						memAlgLock.notify();
-					}
-					setButtonTextCompact = true;
-				}
-				else if(!compactChosen) {
-					allocator.isCompact = true;
-					compactChosen = true;
-					synchronized(CompactLock) {
-						CompactLock.notify();
-					}
-					setButtonTextNormal = true;
-				}
-				else {
-					allocator.Paused = !allocator.Paused;
-					if(allocator.Paused) play.setText("Play");
-					else play.setText("Pause");
-					synchronized(allocator.lock) {
-						allocator.lock.notify();
-					}
-				}
-			}
-			else if(source  == step) {
-				if(!algorithmChosen) {
-					allocator.memAlgo = 1;
-					algorithmChosen = true;
-					synchronized(memAlgLock) {
-						memAlgLock.notify();
-					}
-					setButtonTextCompact = true;
-				}
-				else if(!compactChosen) {
-					allocator.isCompact = false;
-					compactChosen = true;
-					synchronized(CompactLock) {
-						CompactLock.notify();
-					}
-					setButtonTextNormal = true;
-				}
-				else {
-					if(!allocator.Paused) return;
-					allocator.steps++;
-					synchronized(allocator.lock){
-						allocator.lock.notify();
-					}
-				}
-			}
-			else if(source == reset) {
-				System.out.println("Detected");
-				if(!algorithmChosen) {
-					allocator.memAlgo = 2;
-					algorithmChosen = true;
-					synchronized(memAlgLock) {
-						memAlgLock.notify();
-					}
-					setButtonTextCompact = true;
-				}
-				else if(!compactChosen) return;
-				else ResetAlgorithmAndSelection();
-			}
-			else if(source == tmp1) {
-				if(!algorithmChosen) {
-					allocator.memAlgo = 3;
-					algorithmChosen = true;
-					synchronized(memAlgLock) {
-						memAlgLock.notify();
-					}
-					setButtonTextCompact = true;
-				}
-				else if(!compactChosen) return;
-			}
-			
-			if(setButtonTextCompact) {
-				play.setText("yes");
-				step.setText("no");
-				reset.setText("-");
-				tmp1.setText("-");
-				tmp2.setText("-");
-			}
-			else if(setButtonTextNormal) {
-				play.setText("Play");
-				step.setText("Step");
-				reset.setText("reset");
-				tmp1.setText("tmp1");
-				tmp2.setText("tmp2");
-			}
-		}
-		
-	}
 	private int convertToKB(String line[]) {
 		String unit = line[3].toLowerCase();
 		int value = Integer.parseInt(line[2]);
@@ -346,7 +406,53 @@ public class UserInterface extends JFrame {
 			return -1;
 		}
 	}
-	public void setUpAllocator() {
+	private String currentText = "";
+	public Object HelpLock = new Object();
+	public boolean helpRequested = false;
+	private Highlight[] hiarr;
+	//private Highlighter tmphl;
+	private void help() {
+		allocator.Paused = true;
+		allocator.steps = 0;
+		helpRequested = true;
+		while(!allocator.canStep) {
+			synchronized(HelpLock) {
+				try {
+					HelpLock.wait();
+				} catch (InterruptedException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+			}
+		}
+		try {
+			Thread.sleep(1000);
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		helpRequested = false;
+		play.setText("-");
+		step.setText("-");
+		reset.setText("-");
+		newFile.setText("-");
+		help.setText("Back");
+		currentText =  output.getText();
+		output.setText("The memory bar on the right:\nRed portions are free memory. All other colors are partitions that are not available.\n\n"
+				+"Compact:\nIf compact is turned on, the free partitions will be compacted at the end of memory. If not free partitions will not be moved.\n\n"
+				+"Step:\nClick x times to take x steps in the memory allocation algorithm.\n\n"
+				+"Play/Pause:\nPlay will automatically run through the algorithm. And pause will stop the algorithm.\n\n"
+				+"Reset:\nReset will restart the algorithm selection process with the same file that was initially input.\n\n"
+				+"New File:\nWill restart the algorithm selection process with a new file.\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
+	}
+	
+	private void endHelp() {
+		output.setText(currentText);
+		output.setCaretPosition(output.getDocument().getLength());
+		highlight();
+	}
+	
+	private void setUpFile() {
 		boolean fileNotChosen = true;
 		while (fileNotChosen) {
 			JFileChooser chooser = new JFileChooser();
@@ -405,6 +511,10 @@ public class UserInterface extends JFrame {
 				}
 			}
 		}
+	}
+	
+	public void setUpAllocator() {
+		setUpFile();
 		
 		Println("Choose a memory allocation algorithm\n(0 - Best Fit, 1 - Worst Fit, 2 - Next Fit, 3 - First Fit)", Color.WHITE);
 		
@@ -449,7 +559,6 @@ public class UserInterface extends JFrame {
 		output.setText(output.getText() + input + "\n");
 		highlight();
 		output.setCaretPosition(output.getDocument().getLength());
-		lineindex++;
 	}
 	
 	public void Print(String input) {
@@ -522,11 +631,8 @@ public class UserInterface extends JFrame {
 		@Override
 		protected void paintComponent(Graphics g) {
 			super.paintComponent(g);
-			System.out.println("Hello");
 			setSize(this.x, this.y);
 			if(!isPartListDefined) return;
-
-			System.out.println(allocator.partList.size());
 			for(int i = 0; i < allocator.partList.size(); i++) {
 				Partition part = allocator.partList.get(i);
 				int getStart = part.getBase();

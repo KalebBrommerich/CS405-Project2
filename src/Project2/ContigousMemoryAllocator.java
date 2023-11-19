@@ -19,6 +19,7 @@ public class ContigousMemoryAllocator {
 	public ArrayList<Process> currentProcesses;
 	public ArrayList<Process> finishedProcesses;
 	public ArrayList<Process> proc;
+	public Object resetLock = new Object();
 	private static UserInterface ui;
 	// constructor
 
@@ -37,7 +38,7 @@ public class ContigousMemoryAllocator {
 		//System.out.printf("Paritions [Allocated=%d KB, Free=%d KB \n", allocated_memory(), free_memory());
 		ui.Println("Partitions [Allocated="+allocated_memory()+", Free="+free_memory()+"]", Color.yellow);
 		for (Partition part : partList) {
-			ui.Println("Address " + "[" + part.getBase() + ":" + part.getBase() + part.getLength() + "] " + (part.isbFree() ? "Free" : part.getProcess())
+			ui.Println("Address " + "[" + part.getBase() + ":" + (part.getBase() + part.getLength()) + "] " + (part.isbFree() ? "Free" : part.getProcess())
 					+ " ("+part.getLength() + ")" + " {" + part.getRemainingTime() + "}", Color.yellow);
 		}
 	}
@@ -235,7 +236,7 @@ public class ContigousMemoryAllocator {
 		}
 		if (size < 0)
 			return size;
-		//merge_holes();
+		if(isCompact) merge_holes();
 		//merge_adj_holes();
 		return size;
 	}
@@ -402,6 +403,24 @@ public class ContigousMemoryAllocator {
 			}
 		}
 		canStep = true;
+		if(ui.isResetRequested) {
+			synchronized(ui.ResetLock) {
+				ui.ResetLock.notify();
+			}
+			synchronized(resetLock) {
+				try {
+					resetLock.wait();
+				} catch (InterruptedException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+			}
+		}
+		if(ui.helpRequested) {
+			synchronized(ui.HelpLock) {
+				ui.HelpLock.notify();
+			}
+		}
 		if(proc.size() != 0 || currentProcesses.size() != 0)
 			ui.createNewUserInterfaceThread();
 	}
