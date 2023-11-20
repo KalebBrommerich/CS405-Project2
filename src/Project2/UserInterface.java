@@ -55,23 +55,23 @@ public class UserInterface extends JFrame {
 	        return value;
 	    }
 	}
-	private File file;
+	private File file; // the input file the user is choosing to use
 	boolean isResetRequested = false;
-	private int MemoryMax = -1, ProcSizeMax = -1, NumProc = -1, MaxProcTime = -1, size = -1;
-	private Object memAlgLock = new Object();
-	private boolean algorithmChosen = false, compactChosen = false;
-	private JTextArea output;
+	private int MemoryMax = -1, ProcSizeMax = -1, NumProc = -1, MaxProcTime = -1, size = -1; // constants declared in the input file to initialize the allocator
+	private Object memAlgLock = new Object(); // locked until memory algorithm is selected by user
+	private boolean algorithmChosen = false, compactChosen = false; // tracks when the algorithm/compact is selected by user and when it is not
+	private JTextArea output;// the text area when output goes
 	private JScrollPane scroller;
-	private ContigousMemoryAllocator allocator;
+	private ContigousMemoryAllocator allocator; // allocator algorithm
 	private JButton play, step, reset, newFile, help;
-	private ArrayList<Pair<Integer, Integer>> HighlightCoords = new ArrayList<Pair<Integer, Integer>>();
-	private ArrayList<Color> HighlightColors = new ArrayList<Color>();
-	public MemoryVisual mv; 
-	boolean isPartListDefined = false;
-	public Object ResetLock = new Object();
-	private Object CompactLock = new Object();
-	private boolean isHelpOpen = false;
-	String currentButtons[] = new String[5];
+	private ArrayList<Pair<Integer, Integer>> HighlightCoords = new ArrayList<Pair<Integer, Integer>>(); // list that stores where highlights are located in the JTextArea
+	private ArrayList<Color> HighlightColors = new ArrayList<Color>(); // list of colors for highlights in the JTextArea
+	public MemoryVisual mv; //mv is the memory paint component
+	boolean isPartListDefined = false; // Is false until the partList in contigousMemoryAllocator is defined
+	public Object ResetLock = new Object(); // locks until algorithm is terminated
+	private Object CompactLock = new Object(); // locks until compact is selected
+	private boolean isHelpOpen = false; // tracks when help menu is open or closed
+	String currentButtons[] = new String[5]; // stores the buttons' content before the help menu appears.
 	public UserInterface() {
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setSize(722, 434); // Set initial size
@@ -82,8 +82,7 @@ public class UserInterface extends JFrame {
         output = new JTextArea();
         output.setEditable(false);
         scroller = new JScrollPane(output);
-        //scroller.setPreferredSize(new Dimension(300, 400));
-		//output.setMaximumSize(new Dimension(300, 400));
+        
         output.setFont(ariel12);
 		scroller.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED);
 		scroller.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED);
@@ -144,8 +143,8 @@ public class UserInterface extends JFrame {
 			JButton source = (JButton)e.getSource();
 			boolean setButtonTextCompact = false, setButtonTextNormal = false;
 			if(source == play) {
-				if(isHelpOpen) return;
-				if(!algorithmChosen) {
+				if(isHelpOpen) return;// does nothing when help is open
+				if(!algorithmChosen) { // if algorithm has not been chosen this button will choose best fit
 					allocator.memAlgo = 0;
 					algorithmChosen = true;
 					synchronized(memAlgLock) {
@@ -160,19 +159,19 @@ public class UserInterface extends JFrame {
 						CompactLock.notify();
 					}
 					setButtonTextNormal = true;
-				}
+				}// choose compact Yes
 				else {
 					allocator.Paused = !allocator.Paused;
 					if(allocator.Paused) play.setText("Play");
 					else play.setText("Pause");
 					synchronized(allocator.lock) {
 						allocator.lock.notify();
-					}
+					}// play/pause button
 				}
 			}
 			else if(source  == step) {
-				if(isHelpOpen) return;
-				if(!algorithmChosen) {
+				if(isHelpOpen) return;// does nothing when help is open
+				if(!algorithmChosen) { // if algorithm has not been chosen this button will choose worst fit
 					allocator.memAlgo = 1;
 					algorithmChosen = true;
 					synchronized(memAlgLock) {
@@ -187,19 +186,18 @@ public class UserInterface extends JFrame {
 						CompactLock.notify();
 					}
 					setButtonTextNormal = true;
-				}
+				} // choose compact No
 				else {
 					if(!allocator.Paused) return;
 					allocator.steps++;
 					synchronized(allocator.lock){
 						allocator.lock.notify();
-					}
+					} // steps in allocation algorithm
 				}
 			}
 			else if(source == reset) {
-				if(isHelpOpen) return;
-				System.out.println("Detected");
-				if(!algorithmChosen) {
+				if(isHelpOpen) return;// does nothing when help is open
+				if(!algorithmChosen) { // if algorithm has not been chosen this button will choose next fit
 					allocator.memAlgo = 2;
 					algorithmChosen = true;
 					synchronized(memAlgLock) {
@@ -207,14 +205,14 @@ public class UserInterface extends JFrame {
 					}
 					setButtonTextCompact = true;
 				}
-				else if(!compactChosen) return;
+				else if(!compactChosen) return; // does nothing if algorithm is chosen and compact is not
 				else {
 					new Thread(() -> reset()).start();
-				}
+				} // resets the program with same file
 			}
 			else if(source == newFile) {
-				if(isHelpOpen) return;
-				if(!algorithmChosen) {
+				if(isHelpOpen) return;// does nothing when help is open
+				if(!algorithmChosen) { // if algorithm has not been chosen this button will choose first fit
 					allocator.memAlgo = 3;
 					algorithmChosen = true;
 					synchronized(memAlgLock) {
@@ -222,40 +220,40 @@ public class UserInterface extends JFrame {
 					}
 					setButtonTextCompact = true;
 				}
-				else if(!compactChosen) return;
+				else if(!compactChosen) return;// does nothing if algorithm is chosen and compact is not
 				else {
 					new Thread(() -> newFile()).start();
-				}
+				} // resets the program and chooses new file
 			}
 			else {
-				if(isHelpOpen) {
+				if(isHelpOpen) { // close help menu
 					isHelpOpen = false;
-					play.setText(currentButtons[0].equals("Pause")?"Play":currentButtons[0]);
+					play.setText(currentButtons[0].equals("Pause")?"Play":currentButtons[0]); // If play button equaled pause set it back to play
 					step.setText(currentButtons[1]);
 					reset.setText(currentButtons[2]);
 					newFile.setText(currentButtons[3]);
 					help.setText(currentButtons[4]);
-					new Thread(() -> endHelp()).start();
+					new Thread(() -> endHelp()).start(); // close help menu
 				}
 				else {
 					isHelpOpen = true;
-					currentButtons[0] = play.getText();
+					currentButtons[0] = play.getText(); // store the value of the buttons before entering help menu
 					currentButtons[1] = step.getText();
 					currentButtons[2] = reset.getText();
 					currentButtons[3] = newFile.getText();
 					currentButtons[4] = help.getText();
-					new Thread(() -> help()).start();
+					new Thread(() -> help()).start(); //open help menu
 				}
 			}
 			
-			if(setButtonTextCompact) {
+			if(setButtonTextCompact) { // sets up buttons for compact selection
 				play.setText("yes");
 				step.setText("no");
 				reset.setText("-");
 				newFile.setText("-");
 				help.setText("Help");
 			}
-			else if(setButtonTextNormal) {
+			else if(setButtonTextNormal) { // sets buttons to normal value
 				play.setText("Play");
 				step.setText("Step");
 				reset.setText("Reset");
@@ -265,22 +263,22 @@ public class UserInterface extends JFrame {
 		}
 		
 	}
-	private void reset() {
+	private void reset() { // resets allocator algorithm by killing the thread and creating a new algorithm instance
 		KillAllocatorThread();
 		ResetAlgorithmAndSelection();
 	}
 	
-	private void newFile() {
+	private void newFile() { // resets allocator algorithm with new file by killing the thread, prompting user to choose new file, and creating a new algorithm instance
 		KillAllocatorThread();
 		setUpFile();
 		ResetAlgorithmAndSelection();
 	}
 	
-	private void KillAllocatorThread() {
-		isResetRequested = true;
-		allocator.Paused = true;
+	private void KillAllocatorThread() { // kills allocator algorithm thread and waits for it to die
+		isResetRequested = true; // shares that it would like to kill the thread
+		allocator.Paused = true; // sets variables to end the loop in the thread
 		allocator.steps = 0;
-		while(!allocator.canStep) {
+		while(!allocator.canStep) { // waits for the thread to tell this thread that it has quit processing some data
 			synchronized(ResetLock) {
 				try {
 					ResetLock.wait();
@@ -290,31 +288,31 @@ public class UserInterface extends JFrame {
 				}
 			}
 		}
-		allocator.currentProcesses.clear();
-		allocator.proc.clear();
-		synchronized(allocator.resetLock) {
+		allocator.currentProcesses.clear(); // clear that data
+		allocator.proc.clear(); // clear that data
+		synchronized(allocator.resetLock) { // the allocator thread was waiting for me to clear that data. Now I'm done. this kills the thread
 			allocator.resetLock.notify();	
 		}
-		isResetRequested = false;
+		isResetRequested = false; // I no longer would like to kill future threads
 	}
 	
-	private void ResetAlgorithmAndSelection() {
+	private void ResetAlgorithmAndSelection() { // resets the UI and the allocator by creating a new allocator
 		// TODO Auto-generated method stub
-		play.setText("0");
+		play.setText("0"); // set buttons back to beginning value
 		step.setText("1");
 		reset.setText("2");
 		newFile.setText("3");
 		help.setText("Help");
 		output.setText("");
-		HighlightColors.clear();
+		HighlightColors.clear(); //clear the highlighting data
 		HighlightCoords.clear();
 		
-		algorithmChosen = false;
+		algorithmChosen = false; // set variables to track user interface steps back to default value
 		compactChosen = false;
 		isPartListDefined = false;
-		Println("Choose a memory allocation algorithm\n(0 - Best Fit, 1 - Worst Fit, 2 - Next Fit, 3 - First Fit)", Color.WHITE);
+		Println("Choose a memory allocation algorithm\n(0 - Best Fit, 1 - Worst Fit, 2 - Next Fit, 3 - First Fit)", Color.WHITE); // query the user for algorithm type
 		
-		allocator = new ContigousMemoryAllocator(size);
+		allocator = new ContigousMemoryAllocator(size); // wait for the user to declare an algorithm
 		while(!algorithmChosen) {
 			synchronized(memAlgLock) {
 				try {
@@ -326,8 +324,8 @@ public class UserInterface extends JFrame {
 			}
 		}
 		
-		Println("Would you like to compact the memory?\n(yes/no)", Color.WHITE);
-		while(!compactChosen) {
+		Println("Would you like to compact the memory?\n(yes/no)", Color.WHITE); // query the user for compact
+		while(!compactChosen) { // wait for the user to declare value
 			synchronized(CompactLock){
 				try {
 					CompactLock.wait();
@@ -336,7 +334,7 @@ public class UserInterface extends JFrame {
 				}
 			}
 		}
-		allocator.proc = allocator.generateProcesses(ProcSizeMax, NumProc, MaxProcTime);
+		allocator.proc = allocator.generateProcesses(ProcSizeMax, NumProc, MaxProcTime); // reset allocator data
 		allocator.procClone = new ArrayList<>(allocator.proc);
 		allocator.currentProcesses = new ArrayList<>();
 		allocator.finishedProcesses = new ArrayList<>();
@@ -351,11 +349,11 @@ public class UserInterface extends JFrame {
 			e.printStackTrace();
 		}
 	    isPartListDefined = true;
-		Thread t = new Thread(() -> allocator.UserInterfaceStep());
+		Thread t = new Thread(() -> allocator.UserInterfaceStep()); // start the allocation algorithm again
 		t.start();
 	}
 	
-	private int convertToKB(String line[]) {
+	private int convertToKB(String line[]) { // convert different byte units to KB
 		String unit = line[3].toLowerCase();
 		int value = Integer.parseInt(line[2]);
 		switch (unit) {
@@ -381,7 +379,7 @@ public class UserInterface extends JFrame {
 		}
 	}
 
-	private int convertToMS(String line[]) {
+	private int convertToMS(String line[]) { // convert different second units to ms
 		String unit = line[3].toLowerCase();
 		int value = Integer.parseInt(line[2]);
 		switch (unit) {
@@ -407,15 +405,13 @@ public class UserInterface extends JFrame {
 		}
 	}
 	private String currentText = "";
-	public Object HelpLock = new Object();
+	public Object HelpLock = new Object(); // waits for allocator thread to finish up
 	public boolean helpRequested = false;
-	private Highlight[] hiarr;
-	//private Highlighter tmphl;
 	private void help() {
-		allocator.Paused = true;
+		allocator.Paused = true; // set up help menu
 		allocator.steps = 0;
 		helpRequested = true;
-		while(!allocator.canStep) {
+		while(!allocator.canStep) { // once allocator thread is done it will open the help menu
 			synchronized(HelpLock) {
 				try {
 					HelpLock.wait();
@@ -426,13 +422,13 @@ public class UserInterface extends JFrame {
 			}
 		}
 		try {
-			Thread.sleep(1000);
+			Thread.sleep(1000); // sleep to give the ui time to print data to the output JTextArea. So the highlighting does not mess up with multithreading
 		} catch (InterruptedException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 		helpRequested = false;
-		play.setText("-");
+		play.setText("-"); // change buttons to help menu
 		step.setText("-");
 		reset.setText("-");
 		newFile.setText("-");
@@ -443,16 +439,17 @@ public class UserInterface extends JFrame {
 				+"Step:\nClick x times to take x steps in the memory allocation algorithm.\n\n"
 				+"Play/Pause:\nPlay will automatically run through the algorithm. And pause will stop the algorithm.\n\n"
 				+"Reset:\nReset will restart the algorithm selection process with the same file that was initially input.\n\n"
-				+"New File:\nWill restart the algorithm selection process with a new file.\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
+				+"New File:\nWill restart the algorithm selection process with a new file.\n\n\n\n\n\n\n\n\n\n");
+		//display help text
 	}
 	
-	private void endHelp() {
+	private void endHelp() { // close the help menu and set the highlights back
 		output.setText(currentText);
 		output.setCaretPosition(output.getDocument().getLength());
 		highlight();
 	}
 	
-	private void setUpFile() {
+	private void setUpFile() { // function allows user to input a configuration file and processes the configuration.
 		boolean fileNotChosen = true;
 		while (fileNotChosen) {
 			JFileChooser chooser = new JFileChooser();
@@ -468,28 +465,28 @@ public class UserInterface extends JFrame {
 					while (scr.hasNextLine()) {
 						String line = scr.nextLine();
 						String arr[] = line.split(" ");
-						if (arr.length < 3 || !arr[1].equals("="))
+						if (arr.length < 3 || !arr[1].equals("=")) // if line is misconfigured will skip the line
 							continue;
 						String key = arr[0].toUpperCase();
 						switch (key) {
-						case "MEMORY_MAX":
+						case "MEMORY_MAX": // line specifies memory max
 							if (arr.length < 4)
 								continue;
 							MemoryMax = convertToKB(arr);
 							size = MemoryMax;
 							Println("Memory Max: " + MemoryMax, Color.cyan);
 							break;
-						case "PROC_SIZE_MAX":
+						case "PROC_SIZE_MAX": // line specifies proc size max
 							if (arr.length < 4)
 								continue;
 							ProcSizeMax = convertToKB(arr);
 							Println("Proc_Size_Max: " + ProcSizeMax, Color.cyan);
 							break;
-						case "NUM_PROC":
+						case "NUM_PROC": // line specifies number of processes
 							NumProc = Integer.parseInt(arr[2]);
 							Println("Num Proc: " + NumProc, Color.cyan);
 							break;
-						case "MAX_PROC_TIME":
+						case "MAX_PROC_TIME": // line specifies number of processes
 							if (arr.length < 4)
 								continue;
 							MaxProcTime = convertToMS(arr);
@@ -500,7 +497,7 @@ public class UserInterface extends JFrame {
 						}
 					}
 					scr.close();
-					if (MemoryMax == -1 || ProcSizeMax == -1 || NumProc == -1 || MaxProcTime == -1) {
+					if (MemoryMax == -1 || ProcSizeMax == -1 || NumProc == -1 || MaxProcTime == -1) { // if any of the necessary data is missing we will print an error and open the JFileChooser window again
 						Println("The input file is missing an important parameter.", Color.RED);
 					} else {
 						fileNotChosen = false;
@@ -514,12 +511,12 @@ public class UserInterface extends JFrame {
 	}
 	
 	public void setUpAllocator() {
-		setUpFile();
+		setUpFile();// choose file
 		
-		Println("Choose a memory allocation algorithm\n(0 - Best Fit, 1 - Worst Fit, 2 - Next Fit, 3 - First Fit)", Color.WHITE);
+		Println("Choose a memory allocation algorithm\n(0 - Best Fit, 1 - Worst Fit, 2 - Next Fit, 3 - First Fit)", Color.WHITE); // user prompted to choose algorithm
 		
 		allocator = new ContigousMemoryAllocator(size);
-		while(!algorithmChosen) {
+		while(!algorithmChosen) { // ui must wait for user to choose algorithm
 			synchronized(memAlgLock) {
 				try {
 					memAlgLock.wait();
@@ -529,9 +526,9 @@ public class UserInterface extends JFrame {
 				}
 			}
 		}
-		
+		 // user prompted to choose compact yes/no
 		Println("Would you like to compact the memory?\n(yes/no)", Color.WHITE);
-		while(!compactChosen) {
+		while(!compactChosen) { // waits for user to choose
 			synchronized(CompactLock){
 				try {
 					CompactLock.wait();
@@ -549,22 +546,19 @@ public class UserInterface extends JFrame {
 			Println(p.toString(), Color.cyan);
 		}
 		
-	    isPartListDefined = true;
+	    isPartListDefined = true; // part list is now defined
 		Thread t = new Thread(() -> allocator.UserInterfaceStep());
-		t.start();
+		t.start(); // can now start the allocator algorithm step
 	}
 	
-	public void Println(String input, Color c) {
+	public void Println(String input, Color c) { // print line to output + \n
 		cacheNewHighlight(c, output.getText(), input);
 		output.setText(output.getText() + input + "\n");
 		highlight();
 		output.setCaretPosition(output.getDocument().getLength());
 	}
 	
-	public void Print(String input) {
-		output.setText(output.getText() + input);
-	}
-	
+	//store a new highlight coordinates and color in the list of highlights in the JTextArea
 	public void cacheNewHighlight(Color c, String currentText, String newText) {
         int lastLineStart = currentText.length();
         int lastLineEnd = currentText.length()+newText.length();
@@ -572,7 +566,7 @@ public class UserInterface extends JFrame {
 		HighlightColors.add(c);
 	}
 	
-	private void highlight() {
+	private void highlight() { // highlights all of the lines to their respective color. Called each time the text is reset
 		Highlighter highlighter = output.getHighlighter();
 		for(int i = 0; i < HighlightCoords.size(); i++) {
 			int lineStart = HighlightCoords.get(i).key;
@@ -587,10 +581,7 @@ public class UserInterface extends JFrame {
 		}
 	}
 	
-	public void setText(String input) {
-		output.setText(input);
-	}
-	
+	//Creates a new thread for the allocator step algorithm
 	public void createNewUserInterfaceThread() {
 		Thread t = new Thread(() ->allocator.UserInterfaceStep());
 		t.start();
@@ -609,11 +600,10 @@ public class UserInterface extends JFrame {
 			Border border = BorderFactory.createLineBorder(Color.BLACK);
 			setBorder(border);
 			setLayout(null);
-			//setLayout(new FlowLayout(FlowLayout.LEFT, 0, 0));
-			//this.title.setBounds(5, 5, 100, 14);
 			add(this.title);
 		}
 		
+		//Cycles through colors for the partitions that are not free
 		private Color alternateColors() {
 			switch(colorIdx++) {
 			case 0:
@@ -631,22 +621,21 @@ public class UserInterface extends JFrame {
 		@Override
 		protected void paintComponent(Graphics g) {
 			super.paintComponent(g);
-			setSize(this.x, this.y);
-			if(!isPartListDefined) return;
-			for(int i = 0; i < allocator.partList.size(); i++) {
+			setSize(this.x, this.y); // set size of paint component to x and y
+			if(!isPartListDefined) return; // if part list is not defined we will not paint on the paint componenet
+			
+			for(int i = 0; i < allocator.partList.size(); i++) { // paint each partition in the partlist onto the paint component
 				Partition part = allocator.partList.get(i);
 				int getStart = part.getBase();
 				int getEnd = part.getLength() + part.getBase();
-				//System.out.println("Start: " + getStart);
-				//System.out.println("End: " + getEnd);
 				Color partitionColor = alternateColors();
 				if(part.isbFree()) {
 					partitionColor = Color.red;
 					colorIdx--;
 				}
-				double startPercent = (double)getStart/allocator.size;
+				double startPercent = (double)getStart/allocator.size; // take the percentage that the partition takes up relative to the size of the memory container
 				double endPercent = (double)getEnd/allocator.size;
-				int adjustedStart = (int)(startPercent * this.y);
+				int adjustedStart = (int)(startPercent * this.y); // and use this percentage to get the relative size in the paint component in pixels.
 				int adjustedEnd = (int)(endPercent * this.y);
 				
 				g.setColor(partitionColor);
