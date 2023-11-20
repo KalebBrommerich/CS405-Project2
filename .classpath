@@ -6,7 +6,5 @@
 			<attribute name="module" value="true"/>
 		</attributes>
 	</classpathentry>
-	<classpathentry kind="lib" path="C:/Users/ig1461qt/Downloads/jna-5.13.0.jar"/>
-	<classpathentry kind="lib" path="C:/Users/ig1461qt/Downloads/jna-platform-5.13.0.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
