@@ -236,8 +236,7 @@ public class ContigousMemoryAllocator {
 		}
 		if (size < 0)
 			return size;
-		if(isCompact) merge_holes();
-		//merge_adj_holes();
+		if(isCompact) compact_holes();
 		return size;
 	}
 
@@ -266,7 +265,7 @@ public class ContigousMemoryAllocator {
 
 	}
 	// procedure to merge adjacent holes
-	private void merge_holes() {
+	private void compact_holes() {
 		order_partitions();
 		int i = 0;
 		while (i < partList.size() - 1) {
@@ -389,7 +388,6 @@ public class ContigousMemoryAllocator {
 				}
 			}
 			if(!isCompact) merge_adj_holes();
-			else merge_holes();
 			print_status();
 			print_stats();
 			procClone = new ArrayList<>(proc);
